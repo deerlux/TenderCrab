@@ -62,7 +62,7 @@ class TendersdSpider(scrapy.Spider):
                 )
             yield request
 
-        if (not self.pages) or (curpage < self.pages):
+        if (not self.pages) or (int(curpage) < self.pages):
             # 解析下一页
             sels = pageNumSel.xpath(r'./a')
             url = f'{base_url}?colcode={colcode}'
