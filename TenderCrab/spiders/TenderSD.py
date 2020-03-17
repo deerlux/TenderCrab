@@ -2,6 +2,7 @@
 import scrapy
 from TenderCrab.items import TendercrabItem
 from dateutil.parser import parse, ParserError
+import re
 
 
 class TendersdSpider(scrapy.Spider):
@@ -49,18 +50,20 @@ class TendersdSpider(scrapy.Spider):
                 )
             yield request
 
-        # # ---- 然后将所有的页进行解析返回
-        # sels = response.xpath(r'//td[@class="Font9"]/a')
-        # # 最后一个指出尾页的数字 javascript:query(1756)
-        # endPageScr = sels[-1].xpath(r'./@href').extract()[0]
-        # endPage = int(re.findall(r'\d+', endPageScr)[0])
-        # # 遍历每一页
-        # for k, page in enumerate(range(endPage)):
-        #     if k == 0:
-        #         continue
-        #     else:
-        #         request = scrapy.Request(f'{response.url}&curpage={k + 1}', callback=self.parse)
-        #         yield request
+        # ---- 然后将所有的页进行解析返回
+        sels = response.xpath(r'//td[@class="Font9"]/a')
+        # 最后一个指出尾页的数字 javascript:query(1756)
+        endPageScr = sels[-1].xpath(r'./@href').extract()[0]
+        endPage = int(re.findall(r'\d+', endPageScr)[0])
+        # 遍历每一页
+        for k in range(endPage):
+            # 第一页跳过
+            if k == 0:
+                continue
+            request = scrapy.Request(f'{response.url}&curpage={k + 1}',
+                callback=self.parse)
+            self.logger.debug(f'The number of pages is: {k + 1}')
+            yield request
 
     def parse_item(self, response, publishDate):
         # self.logger.debug(f'Parsing URL: {response.url}')

@@ -13,7 +13,7 @@ BOT_NAME = 'TenderCrab'
 
 SPIDER_MODULES = ['TenderCrab.spiders']
 NEWSPIDER_MODULE = 'TenderCrab.spiders'
-DBURL='sqlite:///test.db'
+DBURL = 'sqlite:///test.db'
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'TenderCrab (+http://www.yourdomain.com)'
