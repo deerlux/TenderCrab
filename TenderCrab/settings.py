@@ -20,6 +20,7 @@ DBURL = 'sqlite:///test.db'
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = True
+LOG_FILE = "TenderCrab.log"
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
 #CONCURRENT_REQUESTS = 32

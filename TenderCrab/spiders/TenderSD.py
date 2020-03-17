@@ -17,6 +17,10 @@ class TendersdSpider(scrapy.Spider):
     # )
 
     def parse(self, response):
+        base_url = response.url.split('?')[0]
+        colcode = re.findall(r'colcode=(\d+)', response.url)[0]
+
+        self.logger.debug(f'The URL of parse() is: {response.url}')
         # ---- 首先将有链接的标讯提取出来，然后送给另外一个回调函数去解析
         sels = response.xpath(r'//td[@class="Font9"]')
         # 只在前面的td中找相关的链接
@@ -42,7 +46,7 @@ class TendersdSpider(scrapy.Spider):
             rootUrl = '/'.join(response.url.split('/')[0:3])
             requestUrl = rootUrl + relativeUrl
 
-            self.logger.debug(f'Yield URL: {requestUrl}')
+            self.logger.info(f'Yield URL: {requestUrl}')
             request = scrapy.Request(
                 requestUrl,
                 callback=self.parse_item,
@@ -60,9 +64,11 @@ class TendersdSpider(scrapy.Spider):
             # 第一页跳过
             if k == 0:
                 continue
-            request = scrapy.Request(f'{response.url}&curpage={k + 1}',
-                callback=self.parse)
-            self.logger.debug(f'The number of pages is: {k + 1}')
+            # if k == 2:
+            #     break
+            url = f'{base_url}?colcode={colcode}&curpage={k + 1}'
+            request = scrapy.Request(url, callback=self.parse)
+            self.logger.info(f'The number of pages is: {k + 1}')
             yield request
 
     def parse_item(self, response, publishDate):
@@ -100,5 +106,5 @@ class TendersdSpider(scrapy.Spider):
             item0['price'] = tds[4].extract().strip('\xa0')
             item0['publishDate'] = publishDate
 
-            # self.logger.debug(f"One item is yield: {item0}")
+            self.logger.debug(f"One item is yield: {item0}")
             yield item0
