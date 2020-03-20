@@ -61,13 +61,17 @@ class TendersdSpider(scrapy.Spider):
                 cb_kwargs=cb_kwargs
                 )
             yield request
-
-        if (not self.pages) or (int(curpage) < self.pages):
+        
+        self.logger.debug(f'self.pages={self.pages}, curpage={curpage}')
+        if (self.pages) and (int(curpage) < int(self.pages)) or (not self.pages):
             # 解析下一页
+            self.logger.debug("BINGO")
             sels = pageNumSel.xpath(r'./a')
             url = f'{base_url}?colcode={colcode}'
             for sel in sels:
-                if sel.xpath(r'./text()')[0] == "下一页":
+                temp = sel.xpath(r'./text()').extract()[0]
+                self.logger.debug(f"temp is: {temp}")
+                if temp == "下一页":
                     href = sel.xpath(r'./@href').extract()[0]
                     nextPage = re.findall(r'\d+', href)[0]
                     url = f'{url}&curpage={nextPage}'
@@ -101,7 +105,7 @@ class TendersdSpider(scrapy.Spider):
             item['title'] = response.xpath(r'//div[@align="center"]//text()').extract()[0].strip('\xa0')
         except IndexError as e:
             self.logger.error(e)
-            self.logger.debug(f'The Error URL: {response.url}')
+            self.logger.warn(f'The Error URL: {response.url}')
             yield None
 
         sels = response.xpath(r'//table[@id="NoticeDetail"]//tr')
