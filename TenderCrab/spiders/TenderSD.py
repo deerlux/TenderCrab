@@ -14,7 +14,11 @@ class TendersdSpider(scrapy.Spider):
 
     def __init__(self, pages=None, *args, **kwargs):
         super(TendersdSpider, self).__init__(*args, **kwargs)
-        self.pages = pages
+        if pages:
+            self.pages = int(pages)
+        else:
+            self.pages = None 
+        # self.post_url = 'http://www.ccgp-shandong.gov.cn/sdgp2017/site/channelall.jsp'
 
     # rules = (
     #     Rule(LinkExtractor(allow=r'&id=\d+'), callback='parse_item', follow=True),
@@ -33,6 +37,18 @@ class TendersdSpider(scrapy.Spider):
         sels = response.xpath(r'//td[@class="Font9"]')
         # 只在前面的td中找相关的链接
         pageNumSel = sels.pop(-1)
+        # 如果是第一页，将其他所有页面都弹出到队列中
+        if curpage == 1:
+            if self.pages:
+                numPages = self.pages
+            else:
+                numPages = len(pageNumSel.xpath('.//option'))
+
+            if numPages != 0:
+                for num in range(2, numPages + 1):
+                    self.logger.info(f'curpage = {num} is yield.')
+                    yield scrapy.Request(base_url + f'?colcode={colcode}&curpage={num}', self.parse)
+
         self.logger.debug(f'Find {len(sels)} urls.....')
         for sel in sels:
             temp = sel.xpath(r'./text()').extract()
@@ -49,7 +65,7 @@ class TendersdSpider(scrapy.Spider):
                     continue
             if publishDate:
                 cb_kwargs['publishDate'] = publishDate
-            
+
             relativeUrl = sel.xpath(r'./a/@href').extract()[0]            
             rootUrl = '/'.join(response.url.split('/')[0:3])
             requestUrl = rootUrl + relativeUrl
@@ -62,17 +78,17 @@ class TendersdSpider(scrapy.Spider):
                 )
             yield request
 
-        if (not self.pages) or (int(curpage) < self.pages):
-            # 解析下一页
-            sels = pageNumSel.xpath(r'./a')
-            url = f'{base_url}?colcode={colcode}'
-            for sel in sels:
-                if sel.xpath(r'./text()')[0] == "下一页":
-                    href = sel.xpath(r'./@href').extract()[0]
-                    nextPage = re.findall(r'\d+', href)[0]
-                    url = f'{url}&curpage={nextPage}'
-                    self.logger.debug(f'The number of page is: {nextPage}')
-                    yield scrapy.Request(url, self.parse)
+        # if (not self.pages) or (int(curpage) < self.pages):
+        #     # 解析下一页
+        #     sels = pageNumSel.xpath(r'./a')
+        #     url = f'{base_url}?colcode={colcode}'
+        #     for sel in sels:
+        #         if sel.xpath(r'./text()')[0] == "下一页":
+        #             href = sel.xpath(r'./@href').extract()[0]
+        #             nextPage = re.findall(r'\d+', href)[0]
+        #             url = f'{url}&curpage={nextPage}'
+        #             self.logger.debug(f'The number of page is: {nextPage}')
+        #             yield scrapy.Request(url, self.parse)
 
         # # 如果是curpage = 2进来的，则不再解析每一页
         # if curpage == 1:
@@ -107,8 +123,19 @@ class TendersdSpider(scrapy.Spider):
         sels = response.xpath(r'//table[@id="NoticeDetail"]//tr')
         # 如果没有搜到，可能这个URL地址没有中标清单表
         if not sels:
-            self.logger.debug(f'This url has no "NoticeDetail" table: {response.url}')
-            yield None
+            # 采用另外一种方式搜寻相关的数据
+            temp = response.xpath('//td')
+            tender_table = None
+            for sel in temp:
+                data = sel.xpath('text()').extract()
+                if data:
+                    if data[0].strip() == '标包':
+                        tender_table = sel.xpath('../..')
+                        sels = tender_table.xpath('.//tr')
+                        break
+                    
+        if not sels:
+            self.logger.debug(f'Cannot search the tender table: {response.url}')
 
         for k, sel in enumerate(sels):
             if k == 0:
@@ -130,3 +157,4 @@ class TendersdSpider(scrapy.Spider):
 
             self.logger.debug(f"One item is yield: {item0}")
             yield item0
+
