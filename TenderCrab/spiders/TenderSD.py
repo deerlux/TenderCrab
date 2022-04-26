@@ -2,114 +2,83 @@
 import scrapy
 from TenderCrab.items import TendercrabItem
 from dateutil.parser import parse, ParserError
+from scrapy.http import Response
 import re
 
 
 class TendersdSpider(scrapy.Spider):
     name = 'TenderSD'
-    # /sdgp2017/site/channelall.jsp'
-    allowed_domains = ['www.ccgp-shandong.gov.cn']
-    start_urls = ['http://www.ccgp-shandong.gov.cn/sdgp2017/site/channelall.jsp?colcode=0302',
-        'http://www.ccgp-shandong.gov.cn/sdgp2017/site/channelall.jsp?colcode=0304']
+    
+    # allowed_domains = ['www.ccgp-shandong.gov.cn']
 
     def __init__(self, pages=None, *args, **kwargs):
         super(TendersdSpider, self).__init__(*args, **kwargs)
+        self.start_urls = ['http://ccgp-shandong.gov.cn/sdgp2017/site/listnew.jsp?grade=province&colcode=0302',
+            'http://ccgp-shandong.gov.cn/sdgp2017/site/listnew.jsp?grade=city&colcode=0304']
         if pages:
             self.pages = int(pages)
         else:
-            self.pages = None 
-        # self.post_url = 'http://www.ccgp-shandong.gov.cn/sdgp2017/site/channelall.jsp'
+            self.pages = None
+ 
 
-    # rules = (
-    #     Rule(LinkExtractor(allow=r'&id=\d+'), callback='parse_item', follow=True),
-    # )
+    def parse(self, response: Response):        
+        self.logger.debug(f'Current URL: {response.url}')
+        # 抓取相关的标讯内容链接
+        links = response.css('span.title span a')
+        pubDates = response.css('span.hits')
 
-    def parse(self, response):
+        if len(links) == 0:
+            yield
+        if len(links) != len(pubDates):
+            yield
+                
+        for link, pubDate in zip(links, pubDates):
+            try:
+                url = link.css('::attr("href")').extract()[0]
+                title = link.css('::attr("title")').extract()[0]
+                pubDate = pubDate.css('::text').extract()[0]
+                
+                url = response.urljoin(url)
+                self.logger.debug(f'Yield the tender pages: {url}')
+                yield response.follow(url, callback=self.parse_item, 
+                   cb_kwargs={'title': title, 
+                           'publishDate': pubDate
+                           })
+            except IndexError:
+                self.logger.debug('Failed to extract url from span.')
+
         base_url = response.url.split('?')[0]
+        # 得到colcode值，0302为省级，0304为市县
         colcode = re.findall(r'colcode=(\d+)', response.url)[0]
-        curpage = 1
+        grade = re.findall(r'grade=(\w+)', response.url)[0]
+        # 得到curpage值，默认是1
         temp = re.findall(r'curpage=(\d+)', response.url)
+
         if temp:
             curpage = temp[0]
-
+        else:
+            curpage = 1
+       
         self.logger.debug(f'The URL of parse() is: {response.url}')
-        # ---- 首先将有链接的标讯提取出来，然后送给另外一个回调函数去解析
-        sels = response.xpath(r'//td[@class="Font9"]')
-        # 只在前面的td中找相关的链接
-        pageNumSel = sels.pop(-1)
-        # 如果是第一页，将其他所有页面都弹出到队列中
+
+        # 首先将所有的页面都排到队列里
         if curpage == 1:
-            if self.pages:
-                numPages = self.pages
+            temp = response.css('#totalnum::text').getall()
+            if temp:
+                totalpage = int(temp[0])
             else:
-                numPages = len(pageNumSel.xpath('.//option'))
+                totalpage = 1
+            crawl_pages = self.pages if self.pages else totalpage
+            if crawl_pages ==1:
+                yield
 
-            if numPages != 0:
-                for num in range(2, numPages + 1):
-                    self.logger.info(f'curpage = {num} is yield.')
-                    yield scrapy.Request(base_url + f'?colcode={colcode}&curpage={num}', self.parse)
+            for i in range(curpage + 1, crawl_pages + 1):
+                url = f'{base_url}?curpage={i}&colcode={colcode}&grade={grade}'
+                self.logger.debug(f'Yield URL: {url}')
+                yield response.follow(url, self.parse)
 
-        self.logger.debug(f'Find {len(sels)} urls.....')
-        for sel in sels:
-            temp = sel.xpath(r'./text()').extract()
-            if not temp:
-                self.logger.debug(f'There is not data to extract: {sel}')
-                continue
-            publishDate = None
-            cb_kwargs = {'publishDate': None}
-            # 获取发布时间
-            for strDate in temp:
-                try:
-                    publishDate = parse(strDate)
-                except ParserError:
-                    continue
-            if publishDate:
-                cb_kwargs['publishDate'] = publishDate
 
-            relativeUrl = sel.xpath(r'./a/@href').extract()[0]            
-            rootUrl = '/'.join(response.url.split('/')[0:3])
-            requestUrl = rootUrl + relativeUrl
-
-            self.logger.info(f'Yield URL: {requestUrl}')
-            request = scrapy.Request(
-                requestUrl,
-                callback=self.parse_item,
-                cb_kwargs=cb_kwargs
-                )
-            yield request
-
-        # if (not self.pages) or (int(curpage) < self.pages):
-        #     # 解析下一页
-        #     sels = pageNumSel.xpath(r'./a')
-        #     url = f'{base_url}?colcode={colcode}'
-        #     for sel in sels:
-        #         if sel.xpath(r'./text()')[0] == "下一页":
-        #             href = sel.xpath(r'./@href').extract()[0]
-        #             nextPage = re.findall(r'\d+', href)[0]
-        #             url = f'{url}&curpage={nextPage}'
-        #             self.logger.debug(f'The number of page is: {nextPage}')
-        #             yield scrapy.Request(url, self.parse)
-
-        # # 如果是curpage = 2进来的，则不再解析每一页
-        # if curpage == 1:
-        #     # ---- 然后将所有的页进行解析返回
-        #     sels = response.xpath(r'//td[@class="Font9"]/a')
-        #     # 最后一个指出尾页的数字 javascript:query(1756)
-        #     endPageScr = sels[-1].xpath(r'./@href').extract()[0]
-        #     endPage = int(re.findall(r'\d+', endPageScr)[0])
-        #     # 遍历每一页
-        #     for k in range(2, endPage + 1):
-        #         # 第一页跳过
-        #         if k == 0:
-        #             continue
-        #         # if k == 2:
-        #         #     break
-        #         url = f'{base_url}?colcode={colcode}&curpage={k}'
-        #         request = scrapy.Request(url, callback=self.parse)
-        #         self.logger.info(f'The number of pages is: {k}')
-        #         yield request
-
-    def parse_item(self, response, publishDate):
+    def parse_item(self, response, title, publishDate):
         # self.logger.debug(f'Parsing URL: {response.url}')
         item = TendercrabItem()
         item['url'] = response.url
