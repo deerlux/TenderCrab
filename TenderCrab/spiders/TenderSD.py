@@ -9,8 +9,6 @@ import re
 class TendersdSpider(scrapy.Spider):
     name = 'TenderSD'
     
-    # allowed_domains = ['www.ccgp-shandong.gov.cn']
-
     def __init__(self, pages=None, *args, **kwargs):
         super(TendersdSpider, self).__init__(*args, **kwargs)
         self.start_urls = ['http://ccgp-shandong.gov.cn/sdgp2017/site/listnew.jsp?grade=province&colcode=0302',
@@ -86,7 +84,7 @@ class TendersdSpider(scrapy.Spider):
             item['title'] = response.xpath(r'//div[@align="center"]//text()').extract()[0].strip('\xa0')
         except IndexError as e:
             self.logger.error(e)
-            self.logger.debug(f'The Error URL: {response.url}')
+            self.logger.warn(f'The Error URL: {response.url}')
             yield None
 
         sels = response.xpath(r'//table[@id="NoticeDetail"]//tr')
