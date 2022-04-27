@@ -80,48 +80,17 @@ class TendersdSpider(scrapy.Spider):
         # self.logger.debug(f'Parsing URL: {response.url}')
         item = TendercrabItem()
         item['url'] = response.url
+        item['title'] = title
         try:
-            item['title'] = response.xpath(r'//div[@align="center"]//text()').extract()[0].strip('\xa0')
-        except IndexError as e:
-            self.logger.error(e)
-            self.logger.warn(f'The Error URL: {response.url}')
-            yield None
-
-        sels = response.xpath(r'//table[@id="NoticeDetail"]//tr')
-        # 如果没有搜到，可能这个URL地址没有中标清单表
-        if not sels:
-            # 采用另外一种方式搜寻相关的数据
-            temp = response.xpath('//td')
-            tender_table = None
-            for sel in temp:
-                data = sel.xpath('text()').extract()
-                if data:
-                    if data[0].strip() == '标包':
-                        tender_table = sel.xpath('../..')
-                        sels = tender_table.xpath('.//tr')
-                        break
-                    
-        if not sels:
-            self.logger.debug(f'Cannot search the tender table: {response.url}')
-
-        for k, sel in enumerate(sels):
-            if k == 0:
-                continue
-            tds = sel.xpath(r'./td/text()')
-            if not tds:
-                self.logger.debug(f'The <tr> has no <td>: {sel}')
-                self.logger.debug(f'The Error URL: {response.url}')
-                continue
-            item0 = TendercrabItem()
-            item0['url'] = response.url
-            item0['title'] = item['title'].strip('\xa0')
-            item0['name'] = item['title'] + '-' + tds[1].extract()
-            item0['name'] = item0['name'].strip('\xa0')
-            item0['seller'] = tds[2].extract().strip('\xa0')
-            item0['sellerAddress'] = tds[3].extract().strip('\xa0')
-            item0['price'] = tds[4].extract().strip('\xa0')
-            item0['publishDate'] = publishDate
-
-            self.logger.debug(f"One item is yield: {item0}")
-            yield item0
+            item['publishDate'] = parse(publishDate)
+        except ParserError:
+            self.logger.info(f'Error to parse publishDate: {publishDate}')
+        body = response.css('div#textarea').get()
+        item['body'] = body
+        item['name'] = ''
+        item['sellerAddress'] = ''
+        item['price'] = None
+        item['seller'] = ''
+        yield item
+        
 

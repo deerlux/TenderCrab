@@ -26,6 +26,7 @@ class TendercrabPipeline(object):
             dbItem.url = item['url']
             dbItem.publish_date = item['publishDate']
             dbItem.price = item['price']
+            dbItem.body = item['body']
             self.session.add(dbItem)
             self.session.commit()
         return item

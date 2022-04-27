@@ -15,6 +15,7 @@ class TenderItem(Base):
     seller_address = sa.Column(sa.String)
     price = sa.Column(sa.String)
     publish_date = sa.Column(sa.DateTime)
+    body = sa.Column(sa.String)
 
 
 if __name__ == "__main__":
