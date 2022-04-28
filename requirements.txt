@@ -3,4 +3,5 @@ SQLAlchemy>=1.3.13
 python_dateutil>=2.8.1
 ipython
 ipykernel
+flake8
 

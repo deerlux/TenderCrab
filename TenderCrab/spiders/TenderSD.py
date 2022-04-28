@@ -4,10 +4,17 @@ from TenderCrab.items import TendercrabItem
 from dateutil.parser import parse, ParserError
 from scrapy.http import Response
 import re
+from sqlalchemy.orm import sessionmaker
+import sqlalchemy as sa
+import TenderCrab.settings as settings
+from TenderCrab.DataModels import TenderItem, get_url_hashset
 
 
 class TendersdSpider(scrapy.Spider):
     name = 'TenderSD'
+    url_hashset = set()
+    engine = sa.create_engine(settings.DBURL)
+    Session = sessionmaker(bind=engine)    
     
     def __init__(self, pages=None, *args, **kwargs):
         super(TendersdSpider, self).__init__(*args, **kwargs)
@@ -17,6 +24,12 @@ class TendersdSpider(scrapy.Spider):
             self.pages = int(pages)
         else:
             self.pages = None
+
+        # 以下对数据库的内容进行更新
+        if self.url_hashset:
+            return        
+        with self.Session() as session:
+            self.url_hashset = get_url_hashset()
  
 
     def parse(self, response: Response):        
@@ -37,11 +50,23 @@ class TendersdSpider(scrapy.Spider):
                 pubDate = pubDate.css('::text').extract()[0]
                 
                 url = response.urljoin(url)
-                self.logger.debug(f'Yield the tender pages: {url}')
-                yield response.follow(url, callback=self.parse_item, 
-                   cb_kwargs={'title': title, 
-                           'publishDate': pubDate
-                           })
+                # 如果已经抓取过了，则更新title
+                if hash(url) in self.url_hashset:
+                    item = TendercrabItem()
+                    item['url'] = url
+                    item['title'] = title
+                    try:
+                        item['publishDate'] = parse(pubDate)
+                    except ParserError:
+                        item['publishDate'] = None
+                        self.logger.info(f'Error to parse publishDate: {pubDate}')                    
+                    yield item
+                else:
+                    self.logger.debug(f'Yield the tender pages: {url}')
+                    yield response.follow(url, callback=self.parse_item, 
+                            cb_kwargs={'title': title, 
+                            'publishDate': pubDate
+                            })
             except IndexError:
                 self.logger.debug('Failed to extract url from span.')
 
@@ -72,6 +97,7 @@ class TendersdSpider(scrapy.Spider):
 
             for i in range(curpage + 1, crawl_pages + 1):
                 url = f'{base_url}?curpage={i}&colcode={colcode}&grade={grade}'
+                self.logger.info(f'Starting... colcode: {colcode}, curpage: {i}')
                 self.logger.debug(f'Yield URL: {url}')
                 yield response.follow(url, self.parse)
 
