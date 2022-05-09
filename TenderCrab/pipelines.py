@@ -10,6 +10,7 @@ from TenderCrab.DataModels import TenderItem
 import TenderCrab.DataModels as DataModels
 import sqlalchemy as sa
 import TenderCrab.settings as settings
+from datetime import datetime
 
 class TendercrabPipeline(object):
     
@@ -39,6 +40,7 @@ class TendercrabPipeline(object):
             dbItem.seller_address = item['sellerAddress']
                    
             dbItem.price = item['price']
+            dbItem.crawl_date = datetime.now()
             
             self.session.add(dbItem)
             self.session.commit()

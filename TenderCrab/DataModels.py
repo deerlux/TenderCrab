@@ -13,18 +13,19 @@ Base = declarative_base()
 class TenderItem(Base):
     __tablename__ = 'tender_item'
     id = sa.Column(sa.Integer, primary_key=True,
-        auto_increment=True)
+        autoincrement=True, index=True)
     name = sa.Column(sa.String)
     title = sa.Column(sa.String)
-    url = sa.Column(sa.String)
+    url = sa.Column(sa.String, index=True)
     seller = sa.Column(sa.String)
     seller_address = sa.Column(sa.String)
     price = sa.Column(sa.String)
-    publish_date = sa.Column(sa.DateTime)
+    publish_date = sa.Column(sa.DateTime, index=True)
+    crawl_date = sa.Column(sa.DateTime, index=True)
     body = sa.Column(sa.String)
 
 
-def get_url_hashset() -> set:
+def get_url_hashset():
     result = set()
     with Session() as session:
         stmt = sa.select(TenderItem.url)
