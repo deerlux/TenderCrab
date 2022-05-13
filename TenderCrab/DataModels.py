@@ -22,6 +22,7 @@ class TenderItem(Base):
     price = sa.Column(sa.String)
     publish_date = sa.Column(sa.DateTime, index=True)
     crawl_date = sa.Column(sa.DateTime, index=True)
+    buyer = sa.Column(sa.String)
     body = sa.Column(sa.String)
 
 
